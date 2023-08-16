@@ -1,0 +1,25 @@
+#include "AppConfig.h"
+
+// TODO: WiFi credentials - change them to match your network settings
+const std::string_view AppConfig::WiFiSSID = "WIFI_SSID
+const std::string_view AppConfig::WiFiPassword = "WIFI_PASSWORD";
+const std::string_view AppConfig::ntpServer = "pool.ntp.org";
+const int AppConfig::timeZoneOffset = 3600;
+const int AppConfig::daylightSavingOffset = 3600;
+const uint8_t AppConfig::bme280Address = 0x76;
+const int8_t AppConfig::serial2RxPin = 26;
+const int8_t AppConfig::serial2TxPin = 27;
+// GPIO2 - built-in LED on the board
+const uint8_t AppConfig::ledPin = 2;
+// e-Ink display control.
+// GPIO16 - busy, GPIO15 - reset, GPIO4 - DC, GPIO25 - CS
+const uint8_t AppConfig::epdBusyPin = 16;
+const uint8_t AppConfig::epdResetPin = 15;
+const uint8_t AppConfig::epdDcPin = 4;
+const uint8_t AppConfig::epdCsPin = 25;
+// GPIO12 - step up enable
+const int8_t AppConfig::stepUpPin = 13;
+// GPIO2 - input pin to read battery voltage
+const int8_t AppConfig::voltagePin = 36;
+// Voltage divider correction factor - experimental
+const float AppConfig::batteryVoltageDivider = 1.0f;
