@@ -3,7 +3,7 @@
 	url = https://github.com/espressif/arduino-esp32.git
 [submodule "components/general-support-library"]
 	path = components/general-support-library
-	url = ../../embedded/general-support-library.git
+	url = ../embedded-general-support-library.git
 [submodule "components/SimpleDrivers"]
 	path = components/SimpleDrivers
-	url = ../../embedded/simpledrivers.git
+	url = ../embedded-simple-drivers.git
