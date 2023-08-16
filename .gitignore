@@ -1,0 +1,8 @@
+/.hgignore
+/.hg
+/.idea
+/build
+/cmake-*
+/sdkconfig.old
+/dependencies.lock
+/main/AppConfig.cpp
