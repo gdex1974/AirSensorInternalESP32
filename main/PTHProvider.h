@@ -5,7 +5,9 @@
 
 class PTHProvider {
 public:
-    explicit PTHProvider(embedded::I2CHelper& i2CHelper) : bme(i2CHelper) {};
+    PTHProvider(embedded::I2CHelper& i2CHelper, embedded::PersistentStorage &storage)
+        :bme(i2CHelper)
+        , storage(storage) {};
     bool setup(bool wakeUp);
     bool activate();
     bool hibernate();
@@ -30,5 +32,7 @@ private:
     float pressure{};
     float temperature{};
     float humidity{};
+    bool calibrationDataPresent = false;
     embedded::BMPE280 bme;
+    embedded::PersistentStorage &storage;
 };
