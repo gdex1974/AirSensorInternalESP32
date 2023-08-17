@@ -28,10 +28,7 @@ bool DustMonitorController::setup(bool wakeUp)
         {
             DEBUG_LOG("Restoring dust monitor view data");
             dustMoinitorViewData = *data;
-            if (dustMoinitorViewData.outerData)
-            {
-                DEBUG_LOG("External sensor's data is " << (dustMoinitorViewData.outerData ? "available":"absent"))
-            }
+            DEBUG_LOG("External sensor's data is " << (dustMoinitorViewData.outerData ? "available":"absent"))
         }
         if (auto data = storage.get<ControllerData>(controllerDataTag))
         {
@@ -202,7 +199,7 @@ bool DustMonitorController::canHybernate() const
 
 DustMonitorController::DustMonitorController(embedded::PersistentStorage &storage, embedded::PacketUart &uart,
                                              embedded::I2CHelper& i2CHelper, embedded::EpdInterface& epdInterface)
-        : meteoData(i2CHelper)
+        : meteoData(i2CHelper, storage)
           ,dustData(uart)
           , timeSync(AppConfig::WiFiSSID, AppConfig::WiFiPassword, AppConfig::ntpServer,
                      AppConfig::timeZoneOffset, AppConfig::daylightSavingOffset)
