@@ -16,7 +16,7 @@ This unit is based on Firebeetle-ESP32 board, with the firmware based on ESP-IDF
 - [18650 accumulator]() 18650 accumulator
 - [3,7" WaveShare e-ink display](https://www.waveshare.com/wiki/3.7inch_e-Paper_HAT) 3,7" WaveShare e-ink display
 - [2x20 2,54mm DIP header](https://www.kiwi-electronics.com/en/40-pin-male-header-2x20-1174) 2x20 2,54mm DIP header
-- [Prototyping board 40x60mm 2,54mm pitch] (https://www.kiwi-electronics.com/en/prototyping-board-4x6cm-2-54mm-pitch-3828) Prototype board 40x60mm 2,54mm pitch
+- [Prototyping board 40x60mm 2,54mm pitch](https://www.kiwi-electronics.com/en/prototyping-board-4x6cm-2-54mm-pitch-3828) Prototype board 40x60mm 2,54mm pitch
 
 ## Software
 
