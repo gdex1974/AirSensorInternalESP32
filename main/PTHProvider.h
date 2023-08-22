@@ -6,7 +6,7 @@
 class PTHProvider {
 public:
     PTHProvider(embedded::I2CHelper& i2CHelper, embedded::PersistentStorage &storage)
-        :bme(i2CHelper)
+        : bme(i2CHelper)
         , storage(storage) {};
     bool setup(bool wakeUp);
     bool activate();
@@ -15,23 +15,21 @@ public:
 
     float getPressure() const
     {
-        return pressure;
+        return static_cast<float>(measurementData.pressure) / 256.f;
     }
 
     float getTemperature() const
     {
-        return temperature;
+        return static_cast<float>(measurementData.temperature) / 100.f;;
     }
 
     float getHumidity() const
     {
-        return humidity;
+        return static_cast<float>(measurementData.humidity) / 1024.f;
     }
 
 private:
-    float pressure{};
-    float temperature{};
-    float humidity{};
+    embedded::BMPE280::MeasurementData measurementData{};
     bool calibrationDataPresent = false;
     embedded::BMPE280 bme;
     embedded::PersistentStorage &storage;
