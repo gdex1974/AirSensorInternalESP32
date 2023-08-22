@@ -23,7 +23,7 @@ struct AppConfig
     static const uint8_t epdCsPin;
     // Pins used to control the step-up converter and measure battery voltage
     static const int8_t stepUpPin;
-    static const int8_t voltagePin;
+    static const uint8_t voltagePin;
     // Voltage divider correction factor for the specific board
     static const float voltageDividerCorrection;
 };

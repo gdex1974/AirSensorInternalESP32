@@ -11,8 +11,6 @@
 #include "eInk/Epd3in7Display.h"
 #include "eInk/EpdInterface.h"
 
-#include <Arduino.h>
-
 #include "Debug.h"
 
 using Point = embedded::Point<int>;
@@ -126,22 +124,20 @@ void DustMonitorView::updateView()
 
 void DustMonitorView::drawTime() const
 {
-    if (tm timeInfo {}; getLocalTime(&timeInfo, 0))
+    tm timeInfo = getLocalTime(time(nullptr));
+    std::array<char, 20> string {};
+    embedded::BufferedOut bufferedOut(string);
+    if (timeInfo.tm_hour <10)
     {
-        std::array<char, 20> string {};
-        embedded::BufferedOut bufferedOut(string);
-        if (timeInfo.tm_hour <10)
-        {
-            bufferedOut << "0";
-        }
-        bufferedOut << timeInfo.tm_hour << ":";
-        if (timeInfo.tm_min <10)
-        {
-            bufferedOut << "0";
-        }
-        bufferedOut << timeInfo.tm_min;
-        displayText((std::string_view)bufferedOut, timeArea);
+        bufferedOut << "0";
     }
+    bufferedOut << timeInfo.tm_hour << ":";
+    if (timeInfo.tm_min <10)
+    {
+        bufferedOut << "0";
+    }
+    bufferedOut << timeInfo.tm_min;
+    displayText((std::string_view)bufferedOut, timeArea);
 }
 
 void DustMonitorView::RefreshScreen(const bool needFullRefresh)

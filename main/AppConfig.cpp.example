@@ -20,6 +20,6 @@ const uint8_t AppConfig::epdCsPin = 25;
 // GPIO12 - step up enable
 const int8_t AppConfig::stepUpPin = 13;
 // GPIO2 - input pin to read battery voltage
-const int8_t AppConfig::voltagePin = 36;
+const uint8_t AppConfig::voltagePin = 36;
 // Voltage divider correction factor - experimental
-const float AppConfig::batteryVoltageDivider = 1.0f;
+const float AppConfig::voltageDividerCorrection = 1.0f;
