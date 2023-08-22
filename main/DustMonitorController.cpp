@@ -1,18 +1,29 @@
 #include "DustMonitorController.h"
+#include "AppConfig.h"
 
 #include "TimeFunctions.h"
 #include "PersistentStorage.h"
 
-#include "AppConfig.h"
-#include "Arduino.h"
+#include "AnalogPin.h"
+#include "esp32-arduino/GpioPinDefinition.h"
+
 #include <driver/rtc_io.h>
 #include <esp32-hal-gpio.h>
+
 #include "Debug.h"
 
 namespace
 {
 const std::string_view viewDataTag = "DMC1";
 const std::string_view controllerDataTag = "DMC2";
+
+int readVoltageRaw(uint8_t pin)
+{
+    embedded::GpioPinDefinition voltagePin { pin };
+    const auto voltage = embedded::AnalogPin(voltagePin).singleRead();
+    DEBUG_LOG("VoltageRaw is " << voltage);
+    return voltage;
+}
 }
 
 bool DustMonitorController::setup(bool wakeUp)
@@ -111,15 +122,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
     bool shallStartMeasurement = controllerData.sps30Status == SPS30Status::Startup;
     if (!shallStartMeasurement && controllerData.sps30Status != SPS30Status::Measuring)
     {
-        tm time {};
-        if (getLocalTime(&time, 0))
-        {
-            shallStartMeasurement = time.tm_min == 59;
-            if (shallStartMeasurement)
-            {
-                DEBUG_LOG("PM measurement is required on the last minute of the hour")
-            }
-        }
+        shallStartMeasurement = getLocalTime(time(nullptr)).tm_min == 59;
     }
 
     if (shallStartMeasurement)
@@ -130,7 +133,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
             rtc_gpio_set_level(stepupPin, HIGH);
             const auto voltagePin = (gpio_num_t)AppConfig::voltagePin;
             const float rawToVolts = 3.3f / 0.5f / 4095.f * AppConfig::voltageDividerCorrection;
-            dustMoinitorViewData.innerData.voltage = float(analogRead(voltagePin)) * rawToVolts;
+            dustMoinitorViewData.innerData.voltage = float(readVoltageRaw(voltagePin)) * rawToVolts;
             if (controllerData.sps30Status == SPS30Status::Sleep)
             {
                 DEBUG_LOG("Waking up SPS30")

@@ -17,3 +17,10 @@ inline int64_t microsecondsNow()
     gettimeofday(&tv, nullptr);
     return microsecondsFromTimeval(tv);
 }
+
+inline tm getLocalTime(time_t time)
+{
+    tm info {};
+    localtime_r(&time, &info);
+    return info;
+}
