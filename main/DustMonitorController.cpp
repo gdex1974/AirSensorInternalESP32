@@ -5,10 +5,10 @@
 #include "PersistentStorage.h"
 
 #include "AnalogPin.h"
-#include "esp32-arduino/GpioPinDefinition.h"
+#include "esp32-esp-idf/GpioPinDefinition.h"
 
 #include <driver/rtc_io.h>
-#include <esp32-hal-gpio.h>
+#include <lwip/apps/sntp.h>
 
 #include "Debug.h"
 
@@ -21,7 +21,7 @@ int readVoltageRaw(uint8_t pin)
 {
     embedded::GpioPinDefinition voltagePin { pin };
     const auto voltage = embedded::AnalogPin(voltagePin).singleRead();
-    DEBUG_LOG("VoltageRaw is " << voltage);
+    DEBUG_LOG("VoltageRaw is " << voltage)
     return voltage;
 }
 }
@@ -29,51 +29,80 @@ int readVoltageRaw(uint8_t pin)
 bool DustMonitorController::setup(bool wakeUp)
 {
     const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
-    DEBUG_LOG((wakeUp ? "Waking up the controller" : "Initial setup of the controller"));
+    DEBUG_LOG((wakeUp ? "Waking up the controller" : "Initial setup of the controller"))
     rtc_gpio_init(stepupPin); //initialize the RTC GPIO port
     rtc_gpio_set_direction(stepupPin, RTC_GPIO_MODE_OUTPUT_ONLY); //set the port to output only mode
     rtc_gpio_hold_dis(stepupPin); //disable hold before setting the level
+    wifiManager.initWiFiSubsystem();
     if (wakeUp)
     {
         if (auto data = storage.get<DustMonitorViewData>(viewDataTag))
         {
-            DEBUG_LOG("Restoring dust monitor view data");
+            DEBUG_LOG("Restoring dust monitor view data")
             dustMoinitorViewData = *data;
             DEBUG_LOG("External sensor's data is " << (dustMoinitorViewData.outerData ? "available":"absent"))
         }
         if (auto data = storage.get<ControllerData>(controllerDataTag))
         {
             controllerData = *data;
-            DEBUG_LOG("Last external message recieved: " << controllerData.lastExternalDataTime);
+            DEBUG_LOG("Last external message recieved: " << controllerData.lastExternalDataTime)
         }
     }
     else
     {
-        rtc_gpio_set_level(stepupPin, HIGH); //turn on the step-up converter
+        rtc_gpio_set_level(stepupPin, 1); //turn on the step-up converter
     }
 
     const bool meteoSetupResult = meteoData.setup(wakeUp);
     const bool pmSetupResult = dustData.setup(wakeUp);
-    const bool timeSyncResult = timeSync.setup(wakeUp);
     const bool transportResult = transport.setup(wakeUp);
     const bool viewResult = view.setup(wakeUp);
-    return timeSyncResult && transportResult && viewResult && meteoSetupResult && pmSetupResult;
+    return  transportResult && viewResult && meteoSetupResult && pmSetupResult;
 }
 
 DustMonitorController::ProcessStatus DustMonitorController::process()
 {
-    timeSync.process();
-    if (timeSync.isTimeSyncronized())
+    if (const auto state = wifiManager.getState(); state == WiFiManager::State::Connected)
     {
-        if (timeSync.isConnected())
+        if (isTimeSyncronized())
         {
-            timeSync.disconnect();
-            bool successful = transport.init();
-            DEBUG_LOG("ESP-Now initialization " << (successful ? "completed" : "failed"));
-            (void)successful;
+            if (wifiManager.getState() == WiFiManager::State::Connected)
+            {
+                timeSyncInitialized = false;
+                sntp_stop();
+                DEBUG_LOG("Time is synchronized, disconnecting")
+                wifiManager.stopSTA();
+                bool successful = transport.setup(true);
+                DEBUG_LOG("ESP-Now initialization " << (successful ? "completed" : "failed"))
+                (void)successful;
+            }
+        }
+        else if (!timeSyncInitialized)
+        {
+            DEBUG_LOG("WiFi connected, waiting for time syncronization")
+
+            if (sntp_enabled())
+            {
+                sntp_stop();
+            }
+            sntp_setoperatingmode(SNTP_OPMODE_POLL);
+            sntp_setservername(0, (char*)AppConfig::ntpServer.data());
+            sntp_setservername(1, (char*)nullptr);
+            sntp_setservername(2, (char*)nullptr);
+            sntp_init();
+            timeSyncInitialized = true;
         }
     }
-    else
+    else if (state == WiFiManager::State::Stopped || state == WiFiManager::State::NotInitialized)
+    {
+        if (!isTimeSyncronized() && !timeSyncInitialized)
+        {
+            DEBUG_LOG("Starting STA")
+            wifiManager.startSTA(AppConfig::WiFiSSID, AppConfig::WiFiPassword);
+        }
+    }
+
+    if (!isTimeSyncronized())
     {
         return ProcessStatus::AwaitingForSync;
     }
@@ -109,7 +138,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         {
             if (meteoData.doMeasure())
             {
-                DEBUG_LOG("PTH measurement done");
+                DEBUG_LOG("PTH measurement done")
                 controllerData.lastPTHMeasureTime = currentTime;
                 dustMoinitorViewData.innerData.humidity = meteoData.getHumidity();
                 dustMoinitorViewData.innerData.temperature = meteoData.getTemperature();
@@ -130,7 +159,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         if (controllerData.sps30Status != SPS30Status::Measuring)
         {
             const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
-            rtc_gpio_set_level(stepupPin, HIGH);
+            rtc_gpio_set_level(stepupPin, 1);
             const auto voltagePin = (gpio_num_t)AppConfig::voltagePin;
             const float rawToVolts = 3.3f / 0.5f / 4095.f * AppConfig::voltageDividerCorrection;
             dustMoinitorViewData.innerData.voltage = float(readVoltageRaw(voltagePin)) * rawToVolts;
@@ -153,16 +182,16 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         auto &innerData = dustMoinitorViewData.innerData;
         if (dustData.getMeasureData(innerData.pm01, innerData.pm2p5, innerData.pm10))
         {
-            DEBUG_LOG("PM1 = " << innerData.pm01);
-            DEBUG_LOG("PM2.5 = " << innerData.pm2p5);
-            DEBUG_LOG("PM10 = " << innerData.pm10);
+            DEBUG_LOG("PM1 = " << innerData.pm01)
+            DEBUG_LOG("PM2.5 = " << innerData.pm2p5)
+            DEBUG_LOG("PM10 = " << innerData.pm10)
         }
         dustData.hibernate();
         DEBUG_LOG("Sending SPS30 to sleep")
         controllerData.sps30Status = SPS30Status::Sleep;
         const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
         rtc_gpio_hold_dis(stepupPin); //disable hold before setting the level
-        rtc_gpio_set_level(stepupPin, LOW);
+        rtc_gpio_set_level(stepupPin, 0);
     }
 
     currentTime = time(nullptr);
@@ -203,11 +232,11 @@ bool DustMonitorController::canHybernate() const
 DustMonitorController::DustMonitorController(embedded::PersistentStorage &storage, embedded::PacketUart &uart,
                                              embedded::I2CHelper& i2CHelper, embedded::EpdInterface& epdInterface)
         : meteoData(i2CHelper, storage)
-          ,dustData(uart)
-          , timeSync(AppConfig::WiFiSSID, AppConfig::WiFiPassword, AppConfig::ntpServer,
-                     AppConfig::timeZoneOffset, AppConfig::daylightSavingOffset)
-          , storage(storage)
-          , view(storage, epdInterface, dustMoinitorViewData) {}
+        , dustData(uart)
+        //, timeSync(wifiManager, AppConfig::WiFiSSID, AppConfig::WiFiPassword,AppConfig::ntpServer)
+        , transport(wifiManager)
+        , storage(storage)
+        , view(storage, epdInterface, dustMoinitorViewData) {}
 
 void DustMonitorController::hibernate()
 {
@@ -216,4 +245,9 @@ void DustMonitorController::hibernate()
     storage.set(viewDataTag, dustMoinitorViewData);
     storage.set(controllerDataTag, controllerData);
     DEBUG_LOG("Controller is ready to hibernate")
-};
+}
+
+bool DustMonitorController::isTimeSyncronized() const
+{
+    return (time(nullptr) > 1692025000);
+}

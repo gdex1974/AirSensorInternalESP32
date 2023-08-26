@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <optional>
 
+class WiFiManager;
+
 class EspNowTransport
 {
 public:
@@ -20,6 +22,8 @@ public:
         int64_t timestamp;
     };
 
+    EspNowTransport(WiFiManager &wifiManager)
+            : wifiManager(wifiManager) {}
     bool setup(bool wakeup);
     bool init() const;
     std::optional<DataMessage> getLastMessage() const;
@@ -27,5 +31,6 @@ public:
     bool sendResponce();
 
 private:
+    WiFiManager &wifiManager;
     volatile bool isPeerInfoUpdated = false;
 };
