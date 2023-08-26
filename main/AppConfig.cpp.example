@@ -1,7 +1,7 @@
 #include "AppConfig.h"
 
 // TODO: WiFi credentials - change them to match your network settings
-const std::string_view AppConfig::WiFiSSID = "WIFI_SSID
+const std::string_view AppConfig::WiFiSSID = "WIFI_SSID"
 const std::string_view AppConfig::WiFiPassword = "WIFI_PASSWORD";
 const std::string_view AppConfig::ntpServer = "pool.ntp.org";
 const std::string_view AppConfig::timeZone = "UTC-1DST";
