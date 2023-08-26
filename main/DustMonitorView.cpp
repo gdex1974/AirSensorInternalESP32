@@ -40,7 +40,7 @@ namespace
                                { viewAreaSize.width, timeHeight}};
 }
 
-bool DustMonitorView::setup(bool wakeUp)
+bool DustMonitorView::setup(bool /*wakeUp*/)
 {
     epdInterface.initPins();
     epd.emplace(epdInterface);
@@ -164,6 +164,7 @@ void DustMonitorView::RefreshScreen(const bool needFullRefresh)
     epd->displayFrame(paint.getImage(), needFullRefresh || !partialUpdate ?
         Epd3in7Display::RefreshMode::FullBW : Epd3in7Display::RefreshMode::PartBW);
     DEBUG_LOG("Update time:" << (microsecondsNow() - startTime) << " us")
+    (void)startTime;
 }
 
 void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedValue, const SensorData& newValue) const
@@ -206,7 +207,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
 
     storedValue.voltage = newValue.voltage;
-    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage);
+    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
     displayText((std::string_view)bufferedOut, voltageArea);

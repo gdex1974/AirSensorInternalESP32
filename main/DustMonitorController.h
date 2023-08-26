@@ -1,10 +1,10 @@
 #pragma once
 
-#include "PTHProvider.h"
-#include "SPS30DataProvider.h"
 #include "DustMonitorView.h"
 #include "EspNowTransport.h"
-#include "WiFiTimeSync.h"
+#include "PTHProvider.h"
+#include "SPS30DataProvider.h"
+#include "WiFiManager.h"
 
 namespace embedded
 {
@@ -32,6 +32,8 @@ public:
 
 private:
 
+    bool isTimeSyncronized() const;
+
     enum class SPS30Status
     {
         Startup,
@@ -47,9 +49,9 @@ private:
         time_t lastExternalDataTime = 0;
     };
 
+    WiFiManager wifiManager;
     PTHProvider meteoData;
     SPS30DataProvider dustData;
-    WiFiTimeSync timeSync;
     EspNowTransport transport;
     embedded::PersistentStorage &storage;
     DustMonitorViewData dustMoinitorViewData;
@@ -58,4 +60,5 @@ private:
 
     bool circleCompleted = false;
     bool needsToUpdateClock = true;
+    bool timeSyncInitialized = false;
 };
