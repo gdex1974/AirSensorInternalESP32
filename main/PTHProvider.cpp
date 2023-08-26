@@ -1,10 +1,9 @@
 #include "PTHProvider.h"
 
-#include "BME280/I2CHelper.h"
 #include "BME280/BME280.h"
-#include "Wire.h"
-#include "esp32-arduino/I2CBus.h"
+
 #include "Delays.h"
+
 #include "Debug.h"
 
 namespace
@@ -53,5 +52,12 @@ bool PTHProvider::doMeasure()
     {
         embedded::delay(1);
     }
-    return bme.getMeasureData(temperature, pressure, humidity);
+
+    if (auto fixedResult = bme.getMeasureData())
+    {
+        measurementData = *fixedResult;
+        return true;
+    }
+
+    return false;
 }

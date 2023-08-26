@@ -11,8 +11,6 @@
 #include "eInk/Epd3in7Display.h"
 #include "eInk/EpdInterface.h"
 
-#include <Arduino.h>
-
 #include "Debug.h"
 
 using Point = embedded::Point<int>;
@@ -42,7 +40,7 @@ namespace
                                { viewAreaSize.width, timeHeight}};
 }
 
-bool DustMonitorView::setup(bool wakeUp)
+bool DustMonitorView::setup(bool /*wakeUp*/)
 {
     epdInterface.initPins();
     epd.emplace(epdInterface);
@@ -126,22 +124,20 @@ void DustMonitorView::updateView()
 
 void DustMonitorView::drawTime() const
 {
-    if (tm timeInfo {}; getLocalTime(&timeInfo, 0))
+    tm timeInfo = getLocalTime(time(nullptr));
+    std::array<char, 20> string {};
+    embedded::BufferedOut bufferedOut(string);
+    if (timeInfo.tm_hour <10)
     {
-        std::array<char, 20> string {};
-        embedded::BufferedOut bufferedOut(string);
-        if (timeInfo.tm_hour <10)
-        {
-            bufferedOut << "0";
-        }
-        bufferedOut << timeInfo.tm_hour << ":";
-        if (timeInfo.tm_min <10)
-        {
-            bufferedOut << "0";
-        }
-        bufferedOut << timeInfo.tm_min;
-        displayText((std::string_view)bufferedOut, timeArea);
+        bufferedOut << "0";
     }
+    bufferedOut << timeInfo.tm_hour << ":";
+    if (timeInfo.tm_min <10)
+    {
+        bufferedOut << "0";
+    }
+    bufferedOut << timeInfo.tm_min;
+    displayText((std::string_view)bufferedOut, timeArea);
 }
 
 void DustMonitorView::RefreshScreen(const bool needFullRefresh)
@@ -168,6 +164,7 @@ void DustMonitorView::RefreshScreen(const bool needFullRefresh)
     epd->displayFrame(paint.getImage(), needFullRefresh || !partialUpdate ?
         Epd3in7Display::RefreshMode::FullBW : Epd3in7Display::RefreshMode::PartBW);
     DEBUG_LOG("Update time:" << (microsecondsNow() - startTime) << " us")
+    (void)startTime;
 }
 
 void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedValue, const SensorData& newValue) const
@@ -210,7 +207,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
 
     storedValue.voltage = newValue.voltage;
-    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage);
+    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
     displayText((std::string_view)bufferedOut, voltageArea);

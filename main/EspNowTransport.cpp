@@ -1,4 +1,5 @@
 #include "EspNowTransport.h"
+#include "WiFiManager.h"
 
 #include <array>
 #include <cstring>
@@ -14,7 +15,11 @@ namespace
         int64_t receiveMicroseconds;
     };
 
-    CorrectionMessage correctionMessage;
+    union
+    {
+        CorrectionMessage correctionMessage;
+        std::array<uint8_t, sizeof(correctionMessage)> bytes;
+    } correctionData;
     EspNowTransport::DataMessage measurementDataMessage;
 
     using macValue = std::array<uint8_t, 6>;
@@ -35,20 +40,20 @@ namespace
 
     void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
     {
-        correctionMessage.receiveMicroseconds = microsecondsNow();
+        correctionData.correctionMessage.receiveMicroseconds = microsecondsNow();
         if (len != sizeof(EspNowTransport::DataMessage))
         {
-            DEBUG_LOG("Received " << len << " bytes, expected " << (int)sizeof(EspNowTransport::DataMessage));
+            DEBUG_LOG("Received " << len << " bytes, expected " << (int)sizeof(EspNowTransport::DataMessage))
             return;
         }
-        DEBUG_LOG("Received " << len << " bytes");
+        DEBUG_LOG("Received " << len << " bytes")
         memcpy(remoteMac.begin(), mac, remoteMac.size());
         memcpy(&measurementDataMessage, incomingData, sizeof(measurementDataMessage));
         updated = true;
     }
 
-    void onDataSend(const uint8_t *mac_addr, esp_now_send_status_t status) {
-        DEBUG_LOG("Responce sending was " << (status == ESP_OK ? "successful" : "failed"));
+    void onDataSend(const uint8_t */*mac_addr*/, esp_now_send_status_t status) {
+        DEBUG_LOG("Responce sending was " << (status == ESP_OK ? "successful" : "failed"))
         completed = true;
     }
 
@@ -67,9 +72,9 @@ bool EspNowTransport::setup(bool wakeup)
 
 bool EspNowTransport::init() const
 {
-    if (esp_now_init() != ESP_OK)
+    if (wifiManager.startWiFi() && esp_now_init() != ESP_OK)
     {
-        DEBUG_LOG("Error initializing ESP-NOW");
+        DEBUG_LOG("Error initializing ESP-NOW")
         return false;
     }
 
@@ -102,6 +107,6 @@ bool EspNowTransport::sendResponce()
         addPeer(remoteMac);
         isPeerInfoUpdated = true;
     }
-    correctionMessage.currentMicroseconds = microsecondsNow();
-    return esp_now_send(remoteMac.begin(), reinterpret_cast<const uint8_t *>(&correctionMessage), sizeof(correctionMessage)) == ESP_OK;
+    correctionData.correctionMessage.currentMicroseconds = microsecondsNow();
+    return esp_now_send(remoteMac.begin(), correctionData.bytes.begin(), correctionData.bytes.size()) == ESP_OK;
 }

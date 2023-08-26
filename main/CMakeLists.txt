@@ -10,6 +10,6 @@ idf_component_register(SRCS
         EspNowTransport.cpp
         PTHProvider.cpp
         SPS30DataProvider.cpp
-        WiFiTimeSync.cpp
-        ArduinoStubs.cpp
+        WiFiManager.cpp
+        AppMain.cpp
         INCLUDE_DIRS ".")
