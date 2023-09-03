@@ -233,7 +233,6 @@ DustMonitorController::DustMonitorController(embedded::PersistentStorage &storag
                                              embedded::I2CHelper& i2CHelper, embedded::EpdInterface& epdInterface)
         : meteoData(i2CHelper, storage)
         , dustData(uart)
-        //, timeSync(wifiManager, AppConfig::WiFiSSID, AppConfig::WiFiPassword,AppConfig::ntpServer)
         , transport(wifiManager)
         , storage(storage)
         , view(storage, epdInterface, dustMoinitorViewData) {}
