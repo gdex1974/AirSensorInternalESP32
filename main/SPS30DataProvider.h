@@ -13,6 +13,12 @@ public:
     bool setup(bool wakeUp);
     bool startMeasure();
     bool wakeUp();
+
+    bool sleep()
+    {
+        return sps30.sleep() == embedded::Sps30Error::Success;
+    }
+
     bool hibernate();
     bool getMeasureData(int& pm1, int& pm25, int& pm10);
 private:

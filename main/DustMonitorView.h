@@ -1,6 +1,8 @@
 #pragma once
 
 #include <optional>
+#include <string_view>
+#include <cstdint>
 
 struct SensorData
 {
@@ -66,5 +68,5 @@ private:
     StoredData storedData;
 
     void drawTime() const;
-    void RefreshScreen(bool needFullRefresh);
+    void refreshScreen(bool needFullRefresh);
 };
