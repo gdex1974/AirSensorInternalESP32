@@ -117,7 +117,7 @@ void DustMonitorView::updateView()
     }
 
     drawTime();
-    RefreshScreen(needFullRefresh);
+    refreshScreen(needFullRefresh);
 
     storage.set("view", storedData);
 }
@@ -140,7 +140,7 @@ void DustMonitorView::drawTime() const
     displayText((std::string_view)bufferedOut, timeArea);
 }
 
-void DustMonitorView::RefreshScreen(const bool needFullRefresh)
+void DustMonitorView::refreshScreen(const bool needFullRefresh)
 {
     DEBUG_LOG("Updating screen...")
     bool partialUpdate = false;
@@ -251,6 +251,7 @@ void DustMonitorView::hibernate() const
     if (storedData.updateType == UpdateType::DeepSleep)
     {
         DEBUG_LOG("Sending display to sleep...")
+        epd->waitUntilIdle();
         epd->sleep();
     }
 }
