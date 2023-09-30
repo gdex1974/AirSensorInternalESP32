@@ -6,7 +6,8 @@
 
 #include "graphics/BaseGeometry.h"
 #include "graphics/Canvas.h"
-#include "graphics/EmbeddedFonfs.h"
+#include "graphics/EmbeddedFont.h"
+#include "graphics/GFXFontsAdapter.h"
 #include "graphics/SimpleFrameBuffer.h"
 #include "eInk/Epd3in7Display.h"
 #include "eInk/EpdInterface.h"
@@ -21,23 +22,28 @@ using embedded::Epd3in7Display;
 
 namespace
 {
-    std::optional<Epd3in7Display> epd;
-    SimpleFrameBuffer<Epd3in7Display::epdWidth, Epd3in7Display::epdHeight> image;
-    enum class Color : uint32_t { Black, White };
-    Canvas paint(image);
+using GFXfont = embedded::fonts::FontDescriptor;
+using GFXglyph = embedded::fonts::GlyphDescriptor;
 
-    auto& sans15PtFont = embedded::fonts::FreeSans15pt;
+#include "FreeSans15pt8b.h"
 
-    constexpr Point topLeft { 0, 0 };
-    constexpr Size displaySize { Epd3in7Display::epdWidth, Epd3in7Display::epdHeight};
-    constexpr Size viewAreaSize { displaySize.width - 2 * topLeft.x, displaySize.height - 2 * topLeft.y};
-    constexpr uint16_t timeHeight = 50;
-    constexpr uint16_t fullWidth = displaySize.width - 2 * topLeft.x;
+embedded::fonts::EmbeddedFont sans15PtFont {FreeSans15pt8b};
 
-    constexpr Rect internalSensorArea = {topLeft, {fullWidth, (uint16_t )(viewAreaSize.height - timeHeight) / 2}};
-    constexpr Rect externalSensorArea = internalSensorArea + Size {0, internalSensorArea.size.height};
-    constexpr Rect timeArea = {topLeft + Size {0, viewAreaSize.height - timeHeight},
-                               { viewAreaSize.width, timeHeight}};
+std::optional<Epd3in7Display> epd;
+SimpleFrameBuffer<Epd3in7Display::epdWidth, Epd3in7Display::epdHeight> image;
+enum class Color : uint32_t { Black, White };
+Canvas paint(image);
+
+constexpr Point topLeft { 0, 0 };
+constexpr Size displaySize { Epd3in7Display::epdWidth, Epd3in7Display::epdHeight};
+constexpr Size viewAreaSize { displaySize.width - 2 * topLeft.x, displaySize.height - 2 * topLeft.y};
+constexpr uint16_t timeHeight = 50;
+constexpr uint16_t fullWidth = displaySize.width - 2 * topLeft.x;
+
+constexpr Rect internalSensorArea = {topLeft, {fullWidth, (uint16_t )(viewAreaSize.height - timeHeight) / 2}};
+constexpr Rect externalSensorArea = internalSensorArea + Size {0, internalSensorArea.size.height};
+constexpr Rect timeArea = {topLeft + Size {0, viewAreaSize.height - timeHeight},
+                           { viewAreaSize.width, timeHeight}};
 }
 
 bool DustMonitorView::setup(bool /*wakeUp*/)
@@ -127,16 +133,8 @@ void DustMonitorView::drawTime() const
     tm timeInfo = getLocalTime(time(nullptr));
     std::array<char, 20> string {};
     embedded::BufferedOut bufferedOut(string);
-    if (timeInfo.tm_hour <10)
-    {
-        bufferedOut << "0";
-    }
-    bufferedOut << timeInfo.tm_hour << ":";
-    if (timeInfo.tm_min <10)
-    {
-        bufferedOut << "0";
-    }
-    bufferedOut << timeInfo.tm_min;
+    bufferedOut << embedded::BufferedOut::fill{'0'} << embedded::BufferedOut::width {2}
+                << timeInfo.tm_hour << ":"<< embedded::BufferedOut::width {2} << timeInfo.tm_min;
     displayText(bufferedOut.asStringView(), timeArea);
 }
 
@@ -197,7 +195,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
     {
         bufferedOut << "+";
     }
-    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " C";
+    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " ∞C";
     displayText(bufferedOut.asStringView(), tempArea);
 
     storedValue.pressure = newValue.pressure;
