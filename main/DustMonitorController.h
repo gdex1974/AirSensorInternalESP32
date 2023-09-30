@@ -6,6 +6,8 @@
 #include "SPS30DataProvider.h"
 #include "WiFiManager.h"
 
+#include <ctime>
+
 namespace embedded
 {
 class PersistentStorage;
@@ -28,6 +30,7 @@ public:
     ProcessStatus process();
 
     bool canHybernate() const;
+    bool isMeasuring() const { return controllerData.sps30Status == SPS30Status::Measuring; }
     void hibernate();
 
 private:

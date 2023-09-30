@@ -12,9 +12,9 @@ public:
     struct DataMessage
     {
         char spsSerial[32];
-        uint16_t pm01;
-        uint16_t pm25;
-        uint16_t pm10;
+        int16_t pm01;
+        int16_t pm25;
+        int16_t pm10;
         float humidity;
         float temperature;
         float pressure;

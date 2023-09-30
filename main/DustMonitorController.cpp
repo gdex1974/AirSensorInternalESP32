@@ -11,6 +11,7 @@
 #include <lwip/apps/sntp.h>
 
 #include "Debug.h"
+#include "Delays.h"
 
 namespace
 {
@@ -24,15 +25,37 @@ int readVoltageRaw(uint8_t pin)
     DEBUG_LOG("VoltageRaw is " << voltage)
     return voltage;
 }
+
+void initStepUpControl()
+{
+    const auto stepUpPin = (gpio_num_t)AppConfig::stepUpPin;
+    rtc_gpio_init(stepUpPin); //initialize the RTC GPIO port
+    rtc_gpio_set_direction(stepUpPin, RTC_GPIO_MODE_OUTPUT_ONLY); //set the port to output only mode
+}
+
+void switchStepUpConversion(bool enable)
+{
+    const auto stepUpPin = (gpio_num_t)AppConfig::stepUpPin;
+    rtc_gpio_hold_dis(stepUpPin);
+    rtc_gpio_set_level(stepUpPin, enable ? 1 : 0);
+    if (enable)
+    {
+        embedded::delay(20);
+    }
+}
+
+void holdStepUpConversion()
+{
+    const auto stepUpPin = (gpio_num_t)AppConfig::stepUpPin;
+    rtc_gpio_hold_en(stepUpPin);
+}
+
 }
 
 bool DustMonitorController::setup(bool wakeUp)
 {
-    const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
     DEBUG_LOG((wakeUp ? "Waking up the controller" : "Initial setup of the controller"))
-    rtc_gpio_init(stepupPin); //initialize the RTC GPIO port
-    rtc_gpio_set_direction(stepupPin, RTC_GPIO_MODE_OUTPUT_ONLY); //set the port to output only mode
-    rtc_gpio_hold_dis(stepupPin); //disable hold before setting the level
+    initStepUpControl();
     wifiManager.initWiFiSubsystem();
     if (wakeUp)
     {
@@ -40,7 +63,7 @@ bool DustMonitorController::setup(bool wakeUp)
         {
             DEBUG_LOG("Restoring dust monitor view data")
             dustMoinitorViewData = *data;
-            DEBUG_LOG("External sensor's data is " << (dustMoinitorViewData.outerData ? "available":"absent"))
+            DEBUG_LOG("External sensor's data is " << (dustMoinitorViewData.outerData ? "available" : "absent"))
         }
         if (auto data = storage.get<ControllerData>(controllerDataTag))
         {
@@ -50,14 +73,18 @@ bool DustMonitorController::setup(bool wakeUp)
     }
     else
     {
-        rtc_gpio_set_level(stepupPin, 1); //turn on the step-up converter
+        switchStepUpConversion(true);
     }
-
-    const bool meteoSetupResult = meteoData.setup(wakeUp);
     const bool pmSetupResult = dustData.setup(wakeUp);
+    if (pmSetupResult && !wakeUp)
+    {
+        dustData.sleep();
+        switchStepUpConversion(false);
+    }
+    const bool meteoSetupResult = meteoData.setup(wakeUp);
     const bool transportResult = transport.setup(wakeUp);
     const bool viewResult = view.setup(wakeUp);
-    return  transportResult && viewResult && meteoSetupResult && pmSetupResult;
+    return transportResult && viewResult && meteoSetupResult && pmSetupResult;
 }
 
 DustMonitorController::ProcessStatus DustMonitorController::process()
@@ -112,7 +139,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         controllerData.lastExternalDataTime = currentTime;
         transport.sendResponce();
         DEBUG_LOG("External voltage: " << embedded::SerialOut::precision { 2 } << message->voltage
-        << ", timestamp: " << message->timestamp)
+                                       << ", timestamp: " << message->timestamp)
         if (!dustMoinitorViewData.outerData)
         {
             dustMoinitorViewData.outerData.emplace();
@@ -128,7 +155,8 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
     }
     if (dustMoinitorViewData.outerData && (currentTime > controllerData.lastExternalDataTime + 180))
     {
-        DEBUG_LOG("External sensor's data is outdated: " << controllerData.lastExternalDataTime << ", removing indication")
+        DEBUG_LOG("External sensor's data is outdated: " << controllerData.lastExternalDataTime
+                                                         << ", removing indication")
         dustMoinitorViewData.outerData.reset();
     }
 
@@ -154,12 +182,11 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         shallStartMeasurement = getLocalTime(time(nullptr)).tm_min == 59;
     }
 
-    if (shallStartMeasurement)
+    if (shallStartMeasurement && currentTime - controllerData.lastPMMeasureTime > 10*60)
     {
         if (controllerData.sps30Status != SPS30Status::Measuring)
         {
-            const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
-            rtc_gpio_set_level(stepupPin, 1);
+            switchStepUpConversion(true);
             const auto voltagePin = (gpio_num_t)AppConfig::voltagePin;
             const float rawToVolts = 3.3f / 0.5f / 4095.f * AppConfig::voltageDividerCorrection;
             dustMoinitorViewData.innerData.voltage = float(readVoltageRaw(voltagePin)) * rawToVolts;
@@ -172,11 +199,12 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
             dustData.startMeasure();
             controllerData.sps30Status = SPS30Status::Measuring;
             controllerData.lastPMMeasureTime = currentTime;
-            rtc_gpio_hold_en(stepupPin);
+            holdStepUpConversion();
         }
     }
 
-    if (controllerData.sps30Status == SPS30Status::Measuring && currentTime - controllerData.lastPMMeasureTime > 30)
+    bool wakeUpForMeasurement = false;
+    if (controllerData.sps30Status == SPS30Status::Measuring && currentTime - controllerData.lastPMMeasureTime >= 30)
     {
         DEBUG_LOG("Attempting to obtain PMx data")
         auto &innerData = dustMoinitorViewData.innerData;
@@ -189,9 +217,9 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         dustData.hibernate();
         DEBUG_LOG("Sending SPS30 to sleep")
         controllerData.sps30Status = SPS30Status::Sleep;
-        const auto stepupPin = (gpio_num_t)AppConfig::stepUpPin;
-        rtc_gpio_hold_dis(stepupPin); //disable hold before setting the level
-        rtc_gpio_set_level(stepupPin, 0);
+        switchStepUpConversion(false);
+        wakeUpForMeasurement = true;
+        needsToUpdateClock = time(nullptr) % 60 == 0;
     }
 
     currentTime = time(nullptr);
@@ -207,6 +235,10 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
     else if (currentTime % 60 == 59)
     {
         needsToUpdateClock = true;
+    }
+    if (!needsToUpdateClock && (wakeUpForMeasurement && !needsToUpdateClock))
+    {
+        return ProcessStatus::Completed;
     }
     if (!circleCompleted)
     {
@@ -226,11 +258,11 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
 
 bool DustMonitorController::canHybernate() const
 {
-    return circleCompleted;
+    return circleCompleted || !needsToUpdateClock;
 }
 
 DustMonitorController::DustMonitorController(embedded::PersistentStorage &storage, embedded::PacketUart &uart,
-                                             embedded::I2CHelper& i2CHelper, embedded::EpdInterface& epdInterface)
+                                             embedded::I2CHelper &i2CHelper, embedded::EpdInterface &epdInterface)
         : meteoData(i2CHelper, storage)
         , dustData(uart)
         , transport(wifiManager)

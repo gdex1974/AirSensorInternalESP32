@@ -117,7 +117,7 @@ void DustMonitorView::updateView()
     }
 
     drawTime();
-    RefreshScreen(needFullRefresh);
+    refreshScreen(needFullRefresh);
 
     storage.set("view", storedData);
 }
@@ -137,10 +137,10 @@ void DustMonitorView::drawTime() const
         bufferedOut << "0";
     }
     bufferedOut << timeInfo.tm_min;
-    displayText((std::string_view)bufferedOut, timeArea);
+    displayText(bufferedOut.asStringView(), timeArea);
 }
 
-void DustMonitorView::RefreshScreen(const bool needFullRefresh)
+void DustMonitorView::refreshScreen(const bool needFullRefresh)
 {
     DEBUG_LOG("Updating screen...")
     bool partialUpdate = false;
@@ -189,7 +189,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
     storedValue.humidity = newValue.humidity;
     bufferedOut << embedded::BufferedOut::precision{0} <<storedValue.humidity << "%";
-    displayText((std::string_view)bufferedOut, humidityArea);
+    displayText(bufferedOut.asStringView(), humidityArea);
 
     storedValue.temperature = newValue.temperature;
     bufferedOut.clear();
@@ -198,19 +198,19 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
         bufferedOut << "+";
     }
     bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " C";
-    displayText((std::string_view)bufferedOut, tempArea);
+    displayText(bufferedOut.asStringView(), tempArea);
 
     storedValue.pressure = newValue.pressure;
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{0} << storedValue.pressure / 100.f << " hPa";
-    displayText((std::string_view)bufferedOut, pressureArea);
+    displayText(bufferedOut.asStringView(), pressureArea);
 
 
     storedValue.voltage = newValue.voltage;
     DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
-    displayText((std::string_view)bufferedOut, voltageArea);
+    displayText(bufferedOut.asStringView(), voltageArea);
 
     Rect pmHeaderArea = pressureArea + shiftBottom;
 
@@ -242,7 +242,7 @@ DustMonitorView::drawPMData(const Rect& pm01Area, int value) const
         std::array<char, 20> string {};
         embedded::BufferedOut bufferedOut(string);
         bufferedOut << value;
-        displayText((std::string_view)bufferedOut, pm01Area);
+        displayText(bufferedOut.asStringView(), pm01Area);
     }
 }
 
@@ -251,6 +251,7 @@ void DustMonitorView::hibernate() const
     if (storedData.updateType == UpdateType::DeepSleep)
     {
         DEBUG_LOG("Sending display to sleep...")
+        epd->waitUntilIdle();
         epd->sleep();
     }
 }

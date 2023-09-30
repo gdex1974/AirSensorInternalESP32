@@ -74,17 +74,21 @@ private:
 
 std::optional<ControllersHolder> controllersHolder;
 
-uint32_t calculateHibernationDelay()
+auto getMicrosecondsTillNextMinute()
 {
     const int64_t microSeconds = microsecondsNow();
     const int64_t wholeMinutePast = (microSeconds / microsecondsInMinute) * microsecondsInMinute;
-    const auto timeTillNextMinute = wholeMinutePast + microsecondsInMinute - microSeconds;
+    return wholeMinutePast + microsecondsInMinute - microSeconds;
+}
+
+uint32_t calculateHibernationDelay()
+{
+    const auto timeTillNextMinute = getMicrosecondsTillNextMinute();
     DEBUG_LOG("Time till next minute:" << timeTillNextMinute)
-    const auto minimumDelay = microsecondsInSecond;
     uint32_t delayTime;
-    if (timeTillNextMinute <= minimumDelay)
+    if (timeTillNextMinute <= wakeupDelay)
     {
-        DEBUG_LOG("Too short delay " << timeTillNextMinute << " (" << minimumDelay << "), skipping next wakeup")
+        DEBUG_LOG("Too short delay " << timeTillNextMinute << " (" << wakeupDelay << "), skipping next wakeup")
         delayTime = microsecondsInMinute + timeTillNextMinute - wakeupDelay;
     }
     else
@@ -181,13 +185,21 @@ void loop()
             embedded::delay(1);
             break;
         case DustMonitorController::ProcessStatus::NeedRefreshClock:
-            embedded::delay(100);
+            {
+                const auto delay = std::min((uint32_t)getMicrosecondsTillNextMinute() / 1000 + 1, 100u);
+                DEBUG_LOG("Refresh clock in " << delay << " ms")
+                embedded::delay(delay);
+            }
             break;
         case DustMonitorController::ProcessStatus::Completed:
             if (controller.canHybernate())
             {
                 controller.hibernate();
-                uint32_t delayTime = calculateHibernationDelay();
+                auto delayTime = calculateHibernationDelay();
+                if (controller.isMeasuring())
+                {
+                    delayTime = std::min(delayTime, decltype(delayTime)(30 * microsecondsInSecond));
+                }
                 DEBUG_LOG("Next wakeup in " << delayTime / 1000 << " ms")
                 gettimeofday(&mainData->rtcTimeBeforeDeepSleep, nullptr);
                 mainData->rtcSlowTicksBeforeDeepSleep = rtc_time_get();
@@ -196,7 +208,9 @@ void loop()
             }
             else
             {
-                embedded::delay(calculateHibernationDelay());
+                const auto delayTime = calculateHibernationDelay();
+                DEBUG_LOG("Can't hibernate, delay for "<< delayTime / 1000 << " ms")
+                embedded::delay(delayTime/1000);
             }
             break;
     }
