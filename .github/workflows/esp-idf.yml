@@ -1,0 +1,19 @@
+name: C/C++ CI
+
+on:
+  push:
+    branches: [ "main", "master", "esp-idf-pipeline" ]
+  pull_request:
+    branches: [ "main", "master", "esp-idf-pipeline" ]
+
+jobs:
+  build:
+
+    runs-on: espressif/idf:v4.4.6
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: submodules
+      run: git submodule update --init
+    - name: build
+      run: idf.py build
