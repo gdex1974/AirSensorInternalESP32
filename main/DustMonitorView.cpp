@@ -195,7 +195,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
     {
         bufferedOut << "+";
     }
-    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " °C";
+    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " âˆžC";
     displayText(bufferedOut.asStringView(), tempArea);
 
     storedValue.pressure = newValue.pressure;
