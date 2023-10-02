@@ -21,7 +21,7 @@ build:
     - idf.py build
   artifacts:
     paths:
-      - build/ExternalAirQualitySensor.bin
+      - build/FireBeetleInternalEspIdf.bin
 
 sast:
   stage: check-sast
