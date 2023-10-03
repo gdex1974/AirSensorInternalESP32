@@ -8,26 +8,27 @@
 stages:
 - check-sast
 - build
-
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-
 build:
   stage: build
   tags:
-    - docker
+  - docker
   image: espressif/idf:v4.4.6
   script:
-    - idf.py build
+  - idf.py build
   artifacts:
     paths:
-      - build/FireBeetleInternalEspIdf.bin
-
+    - build/FireBeetleInternalEspIdf.bin
 sast:
   stage: check-sast
   tags:
-    - sast-runner
-
+  - sast-runner
+secret_detection:
+  stage: check-sast
+  tags:
+  - sast-runner
 include:
 - template: SAST.gitlab-ci.yml
 - template: Security/SAST.gitlab-ci.yml
+- template: Security/Secret-Detection.gitlab-ci.yml
