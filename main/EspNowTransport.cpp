@@ -20,7 +20,7 @@ namespace
         CorrectionMessage correctionMessage;
         std::array<uint8_t, sizeof(correctionMessage)> bytes;
     } correctionData;
-    EspNowTransport::DataMessage measurementDataMessage;
+    EspNowTransport::DataMessageV2 measurementDataMessage;
 
     using macValue = std::array<uint8_t, 6>;
     macValue remoteMac {0};
@@ -41,14 +41,21 @@ namespace
     void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
     {
         correctionData.correctionMessage.receiveMicroseconds = microsecondsNow();
-        if (len != sizeof(EspNowTransport::DataMessage))
+        switch (len)
         {
-            DEBUG_LOG("Received " << len << " bytes, expected " << (int)sizeof(EspNowTransport::DataMessage))
-            return;
+            case sizeof(EspNowTransport::DataMessage):
+                DEBUG_LOG("Received data message")
+                break;
+            case sizeof(EspNowTransport::DataMessageV2):
+                DEBUG_LOG("Received data message v2")
+                break;
+            default:
+                DEBUG_LOG("Received " << len << " bytes, expected " << (int)sizeof(EspNowTransport::DataMessage) << " or " << (int)sizeof(EspNowTransport::DataMessageV2))
+                return;
+
         }
-        DEBUG_LOG("Received " << len << " bytes")
         memcpy(remoteMac.begin(), mac, remoteMac.size());
-        memcpy(&measurementDataMessage, incomingData, sizeof(measurementDataMessage));
+        memcpy(&measurementDataMessage, incomingData, len);
         updated = true;
     }
 
@@ -82,7 +89,7 @@ bool EspNowTransport::init() const
         esp_now_register_send_cb(onDataSend) == ESP_OK;
 }
 
-std::optional<EspNowTransport::DataMessage> EspNowTransport::getLastMessage() const
+std::optional<EspNowTransport::DataMessageV2> EspNowTransport::getLastMessage() const
 {
     if (updated)
     {

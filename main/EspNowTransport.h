@@ -21,12 +21,16 @@ public:
         float voltage;
         int64_t timestamp;
     };
+    struct DataMessageV2 : public DataMessage
+    {
+        uint32_t flags = 0;
+    };
 
     EspNowTransport(WiFiManager &wifiManager)
             : wifiManager(wifiManager) {}
     bool setup(bool wakeup);
     bool init() const;
-    std::optional<DataMessage> getLastMessage() const;
+    std::optional<DataMessageV2> getLastMessage() const;
     bool isCompleted() const;
     bool sendResponce();
 
