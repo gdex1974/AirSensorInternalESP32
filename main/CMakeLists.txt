@@ -12,4 +12,8 @@ idf_component_register(SRCS
         SPS30DataProvider.cpp
         WiFiManager.cpp
         AppMain.cpp
-        INCLUDE_DIRS ".")
+        INCLUDE_DIRS "."
+        EMBED_FILES
+        "../data/FreeSans15pt8bBitmaps.bin"
+        "../data/FreeSans15pt8bGlyphs.bin"
+)
