@@ -52,6 +52,10 @@ constexpr Rect internalSensorArea = {topLeft, {fullWidth, (uint16_t )(viewAreaSi
 constexpr Rect externalSensorArea = internalSensorArea + Size {0, internalSensorArea.size.height};
 constexpr Rect timeArea = {topLeft + Size {0, viewAreaSize.height - timeHeight},
                            { viewAreaSize.width, timeHeight}};
+
+enum class SensorFlags : uint32_t {
+    BatteryFailure = 1 << 0,
+};
 }
 
 bool DustMonitorView::setup(bool /*wakeUp*/)
@@ -213,10 +217,15 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
 
     storedValue.voltage = newValue.voltage;
+    storedValue.flags = newValue.flags;
     DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
     displayText(bufferedOut.asStringView(), voltageArea);
+    if (newValue.flags & (uint64_t)SensorFlags::BatteryFailure)
+    {
+        paint.drawRectangle(voltageArea);
+    }
 
     Rect pmHeaderArea = pressureArea + shiftBottom;
 

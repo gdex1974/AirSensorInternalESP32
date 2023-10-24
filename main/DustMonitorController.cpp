@@ -152,6 +152,7 @@ DustMonitorController::ProcessStatus DustMonitorController::process()
         sensorData.pm2p5 = message->pm25;
         sensorData.pm10 = message->pm10;
         sensorData.voltage = message->voltage;
+        sensorData.flags = message->flags;
     }
     if (dustMoinitorViewData.outerData && (currentTime > controllerData.lastExternalDataTime + 180))
     {
