@@ -38,7 +38,11 @@ namespace
         return esp_now_add_peer(&peerInfo) == ESP_OK;
     }
 
+#if __GCC_VERSION__ >= 90000
+    void onDataRecv(const esp_now_recv_info_t * esp_now_info, const uint8_t *incomingData, int len)
+#else
     void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
+#endif
     {
         correctionData.correctionMessage.receiveMicroseconds = microsecondsNow();
         switch (len)
@@ -54,7 +58,11 @@ namespace
                 return;
 
         }
+#if __GCC_VERSION__ >= 90000
+        memcpy(remoteMac.begin(), esp_now_info->src_addr, remoteMac.size());
+#else
         memcpy(remoteMac.begin(), mac, remoteMac.size());
+#endif
         memcpy(&measurementDataMessage, incomingData, len);
         updated = true;
     }
