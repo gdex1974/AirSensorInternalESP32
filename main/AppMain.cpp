@@ -186,7 +186,7 @@ void loop()
             break;
         case DustMonitorController::ProcessStatus::NeedRefreshClock:
             {
-                const auto delay = std::min((uint32_t)getMicrosecondsTillNextMinute() / 1000 + 1, 100u);
+                const auto delay = std::min(getMicrosecondsTillNextMinute() / 1000 + 1, 100ll);
                 DEBUG_LOG("Refresh clock in " << delay << " ms")
                 embedded::delay(delay);
             }
