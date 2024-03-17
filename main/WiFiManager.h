@@ -8,7 +8,7 @@ class WiFiManager
 {
 public:
     enum class State {
-        NotInitialized,
+        NotInitialized = 0,
         Stopped,
         Started,
         Disconnected,
@@ -22,9 +22,11 @@ public:
     void deinitWiFiSubsystem();
     bool startSTA(std::string_view ssid, std::string_view password);
     bool stopSTA();
-    bool startWiFi();
-    bool stopWiFi();
+    static bool startWiFi();
+    static bool stopWiFi();
     State getState() const volatile { return state; }
+    bool waitForConnection(int timeoutMs);
+    bool waitForDisconnect(int timeoutMs);
 private:
     static void eventHandler(void* arg, const char* event_base,
                               int32_t event_id, void* event_data);
