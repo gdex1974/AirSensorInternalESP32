@@ -3,16 +3,29 @@
 #include <esp_wifi_types.h>
 #include <esp_wifi.h>
 #include <cstring>
+#include <freertos/event_groups.h>
 
 #include "Debug.h"
 
+namespace
+{
+constexpr int CONNECTED_BIT = BIT0;
+constexpr int DISCONNECTED_BIT = BIT1;
+constexpr int STOPPED_BIT = BIT2;
+constexpr int CONNECTING_BIT = BIT3;
+constexpr int STARTED_BIT = BIT4;
+EventGroupHandle_t wifiEventGroup = nullptr;
+}
+
 WiFiManager::WiFiManager()
 {
+    wifiEventGroup = xEventGroupCreate();
 }
 
 WiFiManager::~WiFiManager()
 {
     deinitWiFiSubsystem();
+    vEventGroupDelete(wifiEventGroup);
 }
 
 bool WiFiManager::initWiFiSubsystem()
@@ -47,46 +60,53 @@ void WiFiManager::eventHandler(void* arg, esp_event_base_t event_base, int32_t e
 {
     if (arg)
     {
-        auto manager = static_cast<WiFiManager*>(arg);
+        auto manager = reinterpret_cast<WiFiManager*>(arg);
         manager->eventHandler(event_base, event_id, event_data);
     }
 }
 
 void WiFiManager::eventHandler(esp_event_base_t event_base, int32_t event_id, void* /*event_data*/)
 {
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
+    if (event_base == WIFI_EVENT)
     {
-        if (state == State::Connecting)
+        switch (event_id)
         {
-            esp_wifi_connect();
+            case WIFI_EVENT_STA_START:
+                if (state == State::Connecting)
+                {
+                    esp_wifi_connect();
+                    xEventGroupSetBits(wifiEventGroup, CONNECTING_BIT);
+                }
+                else{
+                    state = State::Started;
+                    xEventGroupSetBits(wifiEventGroup, STARTED_BIT);
+                }
+                break;
+            case WIFI_EVENT_STA_DISCONNECTED:
+                if (state == State::Connecting && numberOfRetries++ < 5)
+                {
+                    DEBUG_LOG("Retrying to connect")
+                    esp_wifi_connect();
+                    return;
+                }
+                numberOfRetries = 0;
+                state = State::Disconnected;
+                xEventGroupSetBits(wifiEventGroup, DISCONNECTED_BIT);
+                break;
+            case WIFI_EVENT_STA_STOP:
+                esp_wifi_disconnect();
+                state = State::Stopped;
+                xEventGroupSetBits(wifiEventGroup, STOPPED_BIT);
+                break;
+            default:
+                break;
         }
-        else{
-            state = State::Started;
-        }
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
-    {
-        if (state == State::Connecting)
-        {
-            if (numberOfRetries++ < 5)
-            {
-                DEBUG_LOG("Retrying to connect")
-                esp_wifi_connect();
-                return;
-            }
-        }
-        numberOfRetries = 0;
-        state = State::Disconnected;
-    }
-    else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_STOP)
-    {
-        esp_wifi_disconnect();
-        state = State::Stopped;
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         numberOfRetries = 0;
         state = State::Connected;
+        xEventGroupSetBits(wifiEventGroup, CONNECTED_BIT);
     }
 }
 
@@ -111,9 +131,10 @@ bool WiFiManager::startSTA(std::string_view ssid, std::string_view password)
         {
             DEBUG_LOG("Failed to start WiFi")
             state = State::Stopped;
+            return false;
         }
     }
-    return state == State::Connecting;
+    return true;
 }
 
 bool WiFiManager::startWiFi()
@@ -127,13 +148,16 @@ bool WiFiManager::stopSTA()
     {
         if (stopWiFi())
         {
-            while (state != State::Stopped)
+            if ((xEventGroupWaitBits(wifiEventGroup, STOPPED_BIT, pdTRUE, pdTRUE, portMAX_DELAY) & STOPPED_BIT) != 0)
             {
-                vTaskDelay(1);
+                DEBUG_LOG("Disconnected from AP")
+                return true;
             }
-            DEBUG_LOG("Disconnected from AP")
-            esp_event_handler_unregister(IP_EVENT, ESP_EVENT_ANY_ID, &WiFiManager::eventHandler);
-            esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &WiFiManager::eventHandler);
+            else
+            {
+                DEBUG_LOG("Failed to disconnect from AP")
+                return false;
+            }
         }
     }
     return state == State::Stopped;
@@ -143,3 +167,15 @@ bool WiFiManager::stopWiFi()
 {
     return esp_wifi_stop() == ESP_OK;
 }
+
+bool WiFiManager::waitForConnection(int timeoutMs)
+{
+    return state == State::Connected || xEventGroupWaitBits(wifiEventGroup, CONNECTED_BIT, pdTRUE, pdTRUE, pdMS_TO_TICKS(timeoutMs)) & CONNECTED_BIT;
+}
+
+bool WiFiManager::waitForDisconnect(int timeoutMs)
+{
+    return state == State::Disconnected || xEventGroupWaitBits(wifiEventGroup, DISCONNECTED_BIT, pdTRUE, pdTRUE, pdMS_TO_TICKS(timeoutMs)) & DISCONNECTED_BIT;
+}
+
+

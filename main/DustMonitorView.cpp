@@ -218,7 +218,6 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
     storedValue.voltage = newValue.voltage;
     storedValue.flags = newValue.flags;
-    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
     displayText(bufferedOut.asStringView(), voltageArea);
