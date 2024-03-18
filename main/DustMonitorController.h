@@ -27,15 +27,13 @@ public:
                           embedded::I2CHelper& i2CHelper,
                           embedded::EpdInterface& epdInterface);
     bool setup(bool wakeUp);
-    ProcessStatus process();
+    ProcessStatus process() const;
 
-    bool canHybernate() const;
     bool isMeasuring() const { return controllerData.sps30Status == SPS30Status::Measuring; }
     void hibernate();
 
 private:
-
-    bool isTimeSyncronized() const;
+    static bool isTimeSyncronized() ;
 
     enum class SPS30Status
     {
@@ -50,6 +48,7 @@ private:
         time_t lastPTHMeasureTime = 0;
         time_t lastPMMeasureTime = 0;
         time_t lastExternalDataTime = 0;
+        time_t lastTimeSyncTime = 0;
     };
 
     WiFiManager wifiManager;
@@ -61,7 +60,14 @@ private:
     DustMonitorView view;
     ControllerData controllerData;
 
-    bool circleCompleted = false;
-    bool needsToUpdateClock = true;
+    bool fullCircle = false;
     bool timeSyncInitialized = false;
+    static void updateDisplayTask(void* pvParameters);
+    [[noreturn]] void updateDisplayTask();
+    static void timeSyncTask(void* pvParameters);
+    [[noreturn]] void timeSyncTask();
+    static void measurementTask(void* pvParameters);
+    [[noreturn]] void measurementTask();
+    static void externalDataTask(void* pvParameters);
+    [[noreturn]] void externalDataTask();
 };

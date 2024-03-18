@@ -13,6 +13,7 @@ struct SensorData
     int pm2p5 = -1;
     int pm10 = -1;
     float voltage = 0;
+    uint32_t flags = 0;
 };
 
 struct DustMonitorViewData

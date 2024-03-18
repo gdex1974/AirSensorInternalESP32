@@ -21,7 +21,7 @@
 
 namespace
 {
-constexpr uint32_t rtcCalubrationFactor = (1 << 19);
+constexpr uint32_t rtcCalibrationFactor = (1 << 19);
 
 constexpr uint32_t wakeupDelay = 870000;
 
@@ -39,16 +39,16 @@ struct MainData
 class ControllersHolder
 {
 public:
-    ControllersHolder(embedded::PersistentStorage &storage, int i2cBusNum, int spiBusNum,
+    ControllersHolder(embedded::PersistentStorage &storage, int spiBusNum,
                       int serialPortNum, int8_t address)
-            : i2CBus(i2cBusNum)
+            : i2CBus(0)
               , i2CDevice(i2CBus, address)
               , uartDevice(serialPortNum)
-              , uart2(uartDevice)
+              , sps30Uart(uartDevice)
               , spiBus(spiBusNum)
               , spiDevice(spiBus)
               , epdHAL(spiDevice, rstPin, dcPin, csPin, busyPin)
-              , controller(storage, uart2, i2CDevice, epdHAL)
+              , controller(storage, sps30Uart, i2CDevice, epdHAL)
     {
         i2CBus.init(AppConfig::SDA, AppConfig::SCL, 400000);
         spiBus.init(sckPin, misoPin, mosiPin);
@@ -58,7 +58,7 @@ private:
     embedded::I2CBus i2CBus;
     embedded::I2CHelper i2CDevice;
     embedded::PacketUart::UartDevice uartDevice;
-    embedded::PacketUart uart2;
+    embedded::PacketUart sps30Uart;
     embedded::SpiBus spiBus;
     embedded::SpiDevice spiDevice;
     embedded::GpioPinDefinition rstPin{AppConfig::epdResetPin};
@@ -100,15 +100,15 @@ uint32_t calculateHibernationDelay()
 
 uint32_t calibrateRtcOscillator()
 {
-    const uint32_t cal_count = 1000;
-    uint32_t cali_val;
+    const uint32_t calCount = 1000;
+    uint32_t caliVal;
 
     for (int i = 0; i < 5; ++i)
     {
-        cali_val = rtc_clk_cal(RTC_CAL_32K_XTAL, cal_count);
-        DEBUG_LOG("Calibration " << i << ": " << embedded::BufferedOut::precision { 3 } << rtcCalubrationFactor * 1000.0f / (float)cali_val << " kHz")
+        caliVal = rtc_clk_cal(RTC_CAL_32K_XTAL, calCount);
+        DEBUG_LOG("Calibration " << i << ": " << embedded::BufferedOut::precision { 3 } << rtcCalibrationFactor * 1000.0f / (float)caliVal << " kHz")
     }
-    return cali_val;
+    return caliVal;
 }
 
 void adjustClock(MainData &mainData)
@@ -117,15 +117,15 @@ void adjustClock(MainData &mainData)
     {
         auto newCircles = rtc_time_get();
         uint64_t diffTicks = newCircles - mainData.rtcSlowTicksBeforeDeepSleep;
-        auto diffMicroseconds = diffTicks * mainData.rtcCalibrationResult / rtcCalubrationFactor;
+        auto diffMicroseconds = diffTicks * mainData.rtcCalibrationResult / rtcCalibrationFactor;
         auto timeMicroseconds =
                 mainData.rtcTimeBeforeDeepSleep.tv_sec * 1000000ull +
                 mainData.rtcTimeBeforeDeepSleep.tv_usec;
         timeMicroseconds += diffMicroseconds;
         const uint32_t seconds = timeMicroseconds / 1000000;
         const uint32_t microseconds = timeMicroseconds - seconds * 1000000;
-        timeval tv { .tv_sec = static_cast<time_t>(seconds), .tv_usec= static_cast<suseconds_t>(microseconds) };
-        settimeofday(&tv, nullptr);
+        timeval timeVal { .tv_sec = static_cast<time_t>(seconds), .tv_usec= static_cast<suseconds_t>(microseconds) };
+        settimeofday(&timeVal, nullptr);
         DEBUG_LOG("Calculated sleep time : " << diffMicroseconds)
     }
 }
@@ -154,7 +154,7 @@ void setup()
     embedded::GpioDigitalPin ledPin(ledPinDefinition);
     ledPin.init();
     ledPin.reset();
-    controllersHolder.emplace(*persistentStorage, 0, 2, 2, AppConfig::bme280Address);
+    controllersHolder.emplace(*persistentStorage, 2, 2, AppConfig::bme280Address);
     if (initialSetup)
     {
         DEBUG_LOG("Initial setup")
@@ -164,56 +164,29 @@ void setup()
     {
         adjustClock(*mainData);
     }
-    if (controllersHolder->getController().setup(!initialSetup))
-    {
-        DEBUG_LOG("Setup completed")
-    }
-    else
+    if (!controllersHolder->getController().setup(!initialSetup))
     {
         DEBUG_LOG("Setup failed")
     }
     persistentStorage->set("main", *mainData);
 }
 
-void loop()
+[[noreturn]] void process()
 {
     auto& controller = controllersHolder->getController();
     auto mainData = persistentStorage->get<MainData>("main");
-    switch (controller.process())
+    controller.process();
+    controller.hibernate();
+    auto delayTime = calculateHibernationDelay();
+    if (controller.isMeasuring())
     {
-        case DustMonitorController::ProcessStatus::AwaitingForSync:
-            embedded::delay(1);
-            break;
-        case DustMonitorController::ProcessStatus::NeedRefreshClock:
-            {
-                const auto delay = std::min((uint32_t)getMicrosecondsTillNextMinute() / 1000 + 1, 100u);
-                DEBUG_LOG("Refresh clock in " << delay << " ms")
-                embedded::delay(delay);
-            }
-            break;
-        case DustMonitorController::ProcessStatus::Completed:
-            if (controller.canHybernate())
-            {
-                controller.hibernate();
-                auto delayTime = calculateHibernationDelay();
-                if (controller.isMeasuring())
-                {
-                    delayTime = std::min(delayTime, decltype(delayTime)(30 * microsecondsInSecond));
-                }
-                DEBUG_LOG("Next wakeup in " << delayTime / 1000 << " ms")
-                gettimeofday(&mainData->rtcTimeBeforeDeepSleep, nullptr);
-                mainData->rtcSlowTicksBeforeDeepSleep = rtc_time_get();
-                persistentStorage->set("main", *mainData);
-                esp_deep_sleep(delayTime);
-            }
-            else
-            {
-                const auto delayTime = calculateHibernationDelay();
-                DEBUG_LOG("Can't hibernate, delay for "<< delayTime / 1000 << " ms")
-                embedded::delay(delayTime/1000);
-            }
-            break;
+        delayTime = std::min(delayTime, decltype(delayTime)(30 * microsecondsInSecond));
     }
+    DEBUG_LOG("Next wakeup in " << delayTime / 1000 << " ms")
+    gettimeofday(&mainData->rtcTimeBeforeDeepSleep, nullptr);
+    mainData->rtcSlowTicksBeforeDeepSleep = rtc_time_get();
+    persistentStorage->set("main", *mainData);
+    esp_deep_sleep(delayTime);
 }
 
 extern "C" void app_main()
@@ -225,8 +198,5 @@ extern "C" void app_main()
         ESP_ERROR_CHECK(nvs_flash_init());
     }
     setup();
-    while (true)
-    {
-        loop();
-    }
+    process();
 }

@@ -20,12 +20,20 @@ using Rect = embedded::Rect<int>;
 
 using embedded::Epd3in7Display;
 
+extern const uint8_t mainFontBitmapBegin[] asm("_binary_FreeSans15pt8bBitmaps_bin_start");
+extern const uint8_t mainFontBitmapEnd[]   asm("_binary_FreeSans15pt8bBitmaps_bin_end");
+extern const uint8_t mainFontGlyphsBegin[] asm("_binary_FreeSans15pt8bGlyphs_bin_start");
+extern const uint8_t mainFontGlyphsEnd[]   asm("_binary_FreeSans15pt8bGlyphs_bin_end");
+
 namespace
 {
-using GFXfont = embedded::fonts::FontDescriptor;
-using GFXglyph = embedded::fonts::GlyphDescriptor;
-
-#include "FreeSans15pt8b.h"
+embedded::fonts::FontDescriptor FreeSans15pt8b {
+    embedded::ConstBytesView(mainFontBitmapBegin, mainFontBitmapEnd),
+        embedded::MemoryView<const embedded::fonts::GlyphDescriptor>(
+        reinterpret_cast<const embedded::fonts::GlyphDescriptor*>(mainFontGlyphsBegin)
+        , reinterpret_cast<const embedded::fonts::GlyphDescriptor*>(mainFontGlyphsEnd)),
+    0x20, 0xFF, 0
+};
 
 embedded::fonts::EmbeddedFont sans15PtFont {FreeSans15pt8b};
 
@@ -44,6 +52,10 @@ constexpr Rect internalSensorArea = {topLeft, {fullWidth, (uint16_t )(viewAreaSi
 constexpr Rect externalSensorArea = internalSensorArea + Size {0, internalSensorArea.size.height};
 constexpr Rect timeArea = {topLeft + Size {0, viewAreaSize.height - timeHeight},
                            { viewAreaSize.width, timeHeight}};
+
+enum class SensorFlags : uint32_t {
+    BatteryFailure = 1 << 0,
+};
 }
 
 bool DustMonitorView::setup(bool /*wakeUp*/)
@@ -195,7 +207,7 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
     {
         bufferedOut << "+";
     }
-    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " âˆžC";
+    bufferedOut << embedded::BufferedOut::precision{1} << storedValue.temperature<< " °C";
     displayText(bufferedOut.asStringView(), tempArea);
 
     storedValue.pressure = newValue.pressure;
@@ -205,10 +217,14 @@ void DustMonitorView::updateSensorArea(const Rect& dataArea, SensorData& storedV
 
 
     storedValue.voltage = newValue.voltage;
-    DEBUG_LOG("Voltage = " << embedded::BufferedOut::precision{2} << storedValue.voltage)
+    storedValue.flags = newValue.flags;
     bufferedOut.clear();
     bufferedOut << embedded::BufferedOut::precision{2} << storedValue.voltage << "V";
     displayText(bufferedOut.asStringView(), voltageArea);
+    if (newValue.flags & (uint64_t)SensorFlags::BatteryFailure)
+    {
+        paint.drawRectangle(voltageArea);
+    }
 
     Rect pmHeaderArea = pressureArea + shiftBottom;
 
