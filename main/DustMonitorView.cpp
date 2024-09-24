@@ -9,8 +9,8 @@
 #include "graphics/EmbeddedFont.h"
 #include "graphics/GFXFontsAdapter.h"
 #include "graphics/SimpleFrameBuffer.h"
-#include "eInk/Epd3in7Display.h"
-#include "eInk/EpdInterface.h"
+#include "display/Epd3in7Display.h"
+#include "display/EpdInterface.h"
 
 #include "Debug.h"
 
