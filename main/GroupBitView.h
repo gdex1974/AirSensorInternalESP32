@@ -6,9 +6,15 @@
 class GroupBitView
 {
 public:
+#if __GNUC__ >= 8
+    using EventGroupHandleType = EventGroupHandle_t;
+#else
+    using EventGroupHandleType = void*;
+#endif
+
     GroupBitView() = default;
-    GroupBitView(void* group, int bit) : group(group), bit(bit) {}
-    void* getGroup() const { return group; }
+    GroupBitView(EventGroupHandleType group, int bit) : group(group), bit(bit) {}
+    EventGroupHandleType getGroup() const { return group; }
     bool wait(int timeoutMs) const
     {
         return (xEventGroupWaitBits(getGroup(), bit, pdFALSE, pdFALSE, timeoutMs / portTICK_PERIOD_MS) & bit) != 0;
@@ -35,6 +41,6 @@ public:
         xEventGroupClearBits(getGroup(), bit);
     }
 private:
-    void* group = nullptr;
+    EventGroupHandleType group = nullptr;
     EventBits_t bit = 0;
 };

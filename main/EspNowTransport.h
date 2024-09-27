@@ -40,7 +40,8 @@ public:
 private:
     embedded::PersistentStorage& storage;
     WiFiManager &wifiManager;
-    std::unique_ptr<void, void(*)(void*)> wifiEventGroup;
+    std::unique_ptr<std::remove_pointer<GroupBitView::EventGroupHandleType>::type,
+                    void(*)(GroupBitView::EventGroupHandleType)> wifiEventGroup;
     volatile bool isPeerInfoUpdated = false;
     int attemptsCounter = 0;
     static constexpr int maxAttempts = 10;

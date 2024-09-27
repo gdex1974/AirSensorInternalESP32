@@ -10,11 +10,21 @@ stages:
 - build
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
-build:
+build idf4:
   stage: build
   tags:
   - docker
   image: espressif/idf:v4.4.7
+  script:
+  - idf.py build
+  artifacts:
+    paths:
+    - build/FireBeetleInternalEspIdf.bin
+build idf5:
+  stage: build
+  tags:
+  - docker
+  image: espressif/idf:latest
   script:
   - idf.py build
   artifacts:
