@@ -62,12 +62,15 @@ bool addPeer(const std::array<uint8_t,6>& macAddr)
     return esp_now_add_peer(&peerInfo) == ESP_OK;
 }
 
-#if __GCC_VERSION__ >= 90000
+#if __GNUC__ >= 9
 void onDataRecv(const esp_now_recv_info_t * esp_now_info, const uint8_t *incomingData, int len)
+{
+    const auto mac = esp_now_info->src_addr;
 #else
 void onDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len)
-#endif
 {
+#endif
+
     if (len != sizeof(EspNowTransport::DataMessage))
     {
         DEBUG_LOG("Received " << len << " bytes, expected " << (int)sizeof(EspNowTransport::DataMessage) << " bytes")

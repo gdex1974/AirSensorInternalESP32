@@ -8,7 +8,6 @@
 #include "esp32-esp-idf/GpioPinDefinition.h"
 
 #include <driver/rtc_io.h>
-#include <lwip/apps/sntp.h>
 #include <esp_sntp.h>
 #include <freertos/event_groups.h>
 
@@ -111,14 +110,14 @@ void DustMonitorController::timeSyncTask(void* pvParameters)
             {
                 DEBUG_LOG("Connected to AP")
                 xEventGroupClearBits(eventGroup, TIME_SYNC_BIT);
-                sntp_setoperatingmode(SNTP_OPMODE_POLL);
-                sntp_setservername(0, AppConfig::ntpServer.data());
-                sntp_setservername(1, (char*)nullptr);
-                sntp_setservername(2, (char*)nullptr);
-                sntp_set_time_sync_notification_cb(time_sync_notification_cb);
-                sntp_init();
+                esp_sntp_setoperatingmode(ESP_SNTP_OPMODE_POLL);
+                esp_sntp_setservername(0, AppConfig::ntpServer.data());
+                esp_sntp_setservername(1, (char*)nullptr);
+                esp_sntp_setservername(2, (char*)nullptr);
+                esp_sntp_set_time_sync_notification_cb(time_sync_notification_cb);
+                esp_sntp_init();
                 xEventGroupWaitBits(eventGroup, TIME_SYNC_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
-                sntp_stop();
+                esp_sntp_stop();
                 controllerData.lastTimeSyncTime = time(nullptr);
             }
             else
@@ -156,7 +155,7 @@ void DustMonitorController::updateDisplayTask(void* pvParameters)
     {
         view.updateView();
         xEventGroupSetBits(eventGroup, VIEW_COMPLETED_BIT);
-        vTaskDelayUntil(&lastUpdateTime, 60*1000 / portTICK_PERIOD_MS)
+        xTaskDelayUntil(&lastUpdateTime, 60*1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -229,7 +228,7 @@ void DustMonitorController::measurementTask(void* pvParameters)
 
         xEventGroupSetBits(eventGroup, MEASUREMENT_COMPLETED_BIT);
         const auto delay = (controllerData.sps30Status == SPS30Status::Measuring ? 30 : 60) * 1000 / portTICK_PERIOD_MS;
-        vTaskDelayUntil(&lastUpdateTime, delay)
+        xTaskDelayUntil(&lastUpdateTime, delay);
     }
 }
 
