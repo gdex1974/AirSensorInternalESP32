@@ -4,7 +4,7 @@
 #include "AppConfig.h"
 
 #include "SpiDevice.h"
-#include "eInk/EpdInterface.h"
+#include "display/EpdInterface.h"
 
 #include "esp32-esp-idf/I2CBus.h"
 #include "esp32-esp-idf/PacketUartImpl.h"
